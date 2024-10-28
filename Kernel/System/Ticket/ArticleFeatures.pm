@@ -254,6 +254,8 @@ Returns db success:
 
 =cut
 
+use Data::Dumper;
+
 sub ArticleVersion {
     my ( $Self, %Param ) = @_;
 
@@ -357,9 +359,66 @@ sub ArticleVersion {
         Bind => [ \$Param{ArticleID} ]
     );
 
+    print STDERR "*****************************************************************\n";
+    print STDERR "SELECT id FROM article_version WHERE source_article_id = $Param{ArticleID} ORDER BY id DESC\n";
+    $DBObject->Prepare( 
+        SQL   => 'SELECT id FROM article_version WHERE source_article_id = ? ORDER BY id DESC',
+        Bind  => [ \$Param{ArticleID} ],
+        Limit => 1,
+    );
+    my @RowAux = $DBObject->FetchrowArray();
+    my $ArticleVersionID = $RowAux[0];
+
+    print STDERR "SELECT sum(time_unit) FROM time_accounting_version WHERE article_id = $ArticleVersionID\n";
+    $DBObject->Prepare(
+        SQL   => 'SELECT sum(time_unit) FROM time_accounting_version WHERE article_id = ?',
+        Bind  => [ \$ArticleVersionID ],
+    );
+
+    # Esta query SQL tem um bug
+    # O JOIN vai retornar mais do que uma linha porque vai buscar as versões mais antigas para o mesmo artigo
+    # Isso provoca uma acumulação tal que em vez de 30, 30 + 15 = 45, ..., faz 30, 30 + 30 + 15 = 75, ...
+    # DEPRECATED #######################################
+    #print STDERR "SELECT article_id, sum(time_unit) FROM time_accounting_version tv
+    #              JOIN article_version av ON tv.article_id = av.id
+    #              WHERE source_article_id = $Param{ArticleID} GROUP BY tv.ticket_id ORDER BY tv.article_id DESC\n";
+    #$DBObject->Prepare(
+    #    SQL   => 'SELECT article_id, sum(time_unit) FROM time_accounting_version tv
+    #              JOIN article_version av ON tv.article_id = av.id
+    #              WHERE source_article_id = ? GROUP BY tv.ticket_id ORDER BY tv.article_id DESC',
+    #    Bind  => [ \$Param{ArticleID} ],
+    #);
+    ####################################################
+
+    my $SumTimeUnit = 0;
+    if ( my @Row = $DBObject->FetchrowArray() ) {
+        #my $ArticleVersionID = $Row[0];
+        $SumTimeUnit = $Row[0];
+        $DBObject->Do(
+            SQL => "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
+                    SELECT $NewArticleVersion, ticket_id, time_unit, create_time, create_by, change_time, change_by
+                    FROM time_accounting_version
+                    WHERE article_id = ?",
+            Bind => [ \$ArticleVersionID ]
+        );
+        print STDERR "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
+                    SELECT $NewArticleVersion, ticket_id, time_unit, create_time, create_by, change_time, change_by
+                    FROM time_accounting_version
+                    WHERE article_id = $ArticleVersionID\n";
+    }
+    else {
+        #die Dumper \%Param;
+        #die "SELECT article_id, sum(time_unit) FROM time_accounting_version tv
+        #     JOIN article_version av ON tv.article_id = av.id
+        #     WHERE source_article_id = $Param{ArticleID} GROUP BY tv.ticket_id ORDER BY tv.article_id DESC";
+    }
+    print STDERR "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
+                SELECT $NewArticleVersion, ticket_id, time_unit - $SumTimeUnit, create_time, create_by, change_time, change_by
+                FROM time_accounting
+                WHERE article_id = $Param{ArticleID}";
     $DBObject->Do(
         SQL => "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
-                SELECT $NewArticleVersion, ticket_id, time_unit, create_time, create_by, change_time, change_by
+                SELECT $NewArticleVersion, ticket_id, time_unit - $SumTimeUnit, create_time, create_by, change_time, change_by
                 FROM time_accounting
                 WHERE article_id = ?",
         Bind => [ \$Param{ArticleID} ]

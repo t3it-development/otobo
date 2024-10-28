@@ -2,7 +2,7 @@
 # OTOBO is a web-based ticketing system for service organisations.
 # --
 # Copyright (C) 2001-2020 OTRS AG, https://otrs.com/
-# Copyright (C) 2019-2024 Rother OSS GmbH, https://otobo.io/
+# Copyright (C) 2019-2024 Rother OSS GmbH, https://otobo.de/
 # Copyright (C) 2012-2020 Znuny GmbH, http://znuny.com/
 # --
 # This program is free software: you can redistribute it and/or modify it under
@@ -6334,14 +6334,33 @@ sub TicketAccountTime {
     $Param{TimeUnit} = $DBObject->Quote( $Param{TimeUnit}, 'Number' );
 
     # db update
-    return if !$DBObject->Do(
-        SQL => "INSERT INTO time_accounting "
-            . " (ticket_id, article_id, time_unit, create_time, create_by, change_time, change_by) "
-            . " VALUES (?, ?, $Param{TimeUnit}, current_timestamp, ?, current_timestamp, ?)",
-        Bind => [
-            \$Param{TicketID}, \$Param{ArticleID}, \$Param{UserID}, \$Param{UserID},
-        ],
+
+    $DBObject->Prepare(
+        SQL   => 'SELECT id, time_unit FROM time_accounting WHERE article_id = ?',
+        Bind  => [ \$Param{ArticleID} ],
+        Limit => 1
     );
+
+    # fetch the data
+    if ( my @Row = $DBObject->FetchrowArray() ) {
+        my $ID = $Row[0];
+        my $NewTimeUnit = $Row[1] + $Param{TimeUnit};
+        return if !$DBObject->Do(
+            SQL => 'UPDATE time_accounting SET time_unit = ?, change_time = current_timestamp, change_by = ? WHERE id = ?',
+            Bind => [ \$NewTimeUnit, \$Param{UserID}, \$ID ],
+        );
+    }
+    else {
+        return if !$DBObject->Do(
+            SQL => "INSERT INTO time_accounting "
+                . " (ticket_id, article_id, time_unit, create_time, create_by, change_time, change_by) "
+                . " VALUES (?, ?, $Param{TimeUnit}, current_timestamp, ?, current_timestamp, ?)",
+            Bind => [
+                \$Param{TicketID}, \$Param{ArticleID}, \$Param{UserID}, \$Param{UserID},
+            ],
+        );
+    }
+
 
     # clear ticket cache
     $Self->_TicketCacheClear( TicketID => $Param{TicketID} );
@@ -6362,6 +6381,7 @@ sub TicketAccountTime {
         Data  => {
             TicketID  => $Param{TicketID},
             ArticleID => $Param{ArticleID},
+            TimeUnits => $Param{TimeUnit}
         },
         UserID => $Param{UserID},
     );
@@ -6453,10 +6473,18 @@ sub TicketMerge {
     );
 
     # update the accounted time of the main ticket
+    # there is only one table row for each one of the tickets
+    # enforce that after merging there is only one row for the main ticket:
+    # 1. increment the accounted time of the main ticket with the accounted time of the merged ticket
+    # 2. remove the merged ticket row
     return if !$DBObject->Do(
-        SQL => 'UPDATE time_accounting SET ticket_id = ?, change_time = current_timestamp, '
-            . ' change_by = ? WHERE ticket_id = ?',
-        Bind => [ \$Param{MainTicketID}, \$Param{UserID}, \$Param{MergeTicketID} ],
+        SQL => 'UPDATE time_accounting SET time_unit = time_unit + (SELECT sum(time_unit) FROM time_accounting WHERE ticket_id = ?) '
+            .  'WHERE ticket_id = ?',
+        Bind => [ \$Param{MergeTicketID}, \$Param{MainTicketID} ],
+    );
+    return if !$DBObject->Do(
+        SQL => 'DELETE FROM time_accounting WHERE ticket_id = ?',
+        Bind => [ \$Param{MergeTicketID} ],
     );
 
     my %MainTicket = $Self->TicketGet(
