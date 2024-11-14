@@ -254,8 +254,6 @@ Returns db success:
 
 =cut
 
-use Data::Dumper;
-
 sub ArticleVersion {
     my ( $Self, %Param ) = @_;
 
@@ -362,8 +360,9 @@ sub ArticleVersion {
     my $SumTimeUnit = 0;
     $DBObject->Prepare(
         SQL   => 'SELECT article_id, sum(time_unit) FROM time_accounting_version tv
-                  JOIN article_version av ON tv.article_id = av.id
-                  WHERE source_article_id = ? GROUP BY tv.article_id ORDER BY tv.article_id DESC',
+                  INNER JOIN article_version av ON tv.article_id = av.id
+                  WHERE source_article_id = ? AND article_delete = 0
+                  GROUP BY tv.article_id ORDER BY tv.article_id DESC',
         Bind  => [ \$Param{ArticleID} ],
         Limit => 1,
     );
@@ -378,15 +377,7 @@ sub ArticleVersion {
                     WHERE article_id = ?",
             Bind => [ \$ArticleVersionID ]
         );
-        print STDERR "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
-                    SELECT $NewArticleVersion, ticket_id, time_unit, create_time, create_by, change_time, change_by
-                    FROM time_accounting_version
-                    WHERE article_id = $ArticleVersionID\n";
     }
-    print STDERR "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
-                SELECT $NewArticleVersion, ticket_id, time_unit - $SumTimeUnit, create_time, create_by, change_time, change_by
-                FROM time_accounting
-                WHERE article_id = $Param{ArticleID}";
     $DBObject->Do(
         SQL => "INSERT INTO time_accounting_version (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
                 SELECT $NewArticleVersion, ticket_id, time_unit - $SumTimeUnit, create_time, create_by, change_time, change_by
@@ -492,14 +483,6 @@ sub ArticleRestore {
         Bind => [ \$ArticleVersionID ]
     );
 
-    $DBObject->Do(
-        SQL => "INSERT INTO time_accounting (article_id, ticket_id, time_unit, create_time, create_by, change_time, change_by)
-                SELECT $ArticleID, ticket_id, time_unit, create_time, create_by, change_time, change_by
-                FROM time_accounting_version
-                WHERE article_id = ?",
-        Bind => [ \$ArticleVersionID ]
-    );
-
     my $Success = $DBObject->Do(
         SQL  => "UPDATE ticket_history SET article_id = ? WHERE id IN (SELECT history_id FROM article_version_history WHERE article_id = ?) AND ticket_id = ?",
         Bind => [ \$ArticleID, \$ArticleID, \$Param{TicketID} ]
@@ -527,6 +510,46 @@ sub ArticleRestore {
             Bind => [ \$ArticleVersionID ]
         );
 
+        $Self->ArticleVersion(
+            ArticleID => $Param{ArticleID},
+            TicketID  => $Param{TicketID},
+            UserID    => $Param{UserID},
+        );
+
+        $DBObject->Prepare(
+            SQL => 'SELECT tv.*, source_article_id FROM time_accounting_version tv
+                    INNER JOIN article_version av ON tv.article_id = av.id 
+                    WHERE article_id = ? ORDER BY id',
+            Bind => [ \$ArticleVersionID ]
+        );
+
+        my %Data;
+        my $SourceArticleId;
+        while ( my @Row = $DBObject->FetchrowArray() ) {
+            if ( !%Data ) {
+                %Data = (
+                    ticket_id   => $Row[1],
+                    article_id  => $Row[2],
+                    time_unit   => $Row[3],
+                    create_time => $Row[4],
+                    create_by   => $Row[5],
+                );
+                $SourceArticleId = $Row[8];
+            }
+            else {
+                $Data{time_unit} += $Row[3];
+            }
+            $Data{change_time} = $Row[6];
+            $Data{change_by}   = $Row[7];
+        }
+
+        $DBObject->Do(
+            SQL => 'INSERT INTO time_accounting(ticket_id, article_id, time_unit, create_time, create_by, change_time, change_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)',
+            Bind => [ \$Data{ticket_id}, \$SourceArticleId, \$Data{time_unit},
+                      \$Data{create_time}, \$Data{create_by}, \$Data{change_time}, \$Data{change_by} ],
+        );
+
         $DBObject->Do(
             SQL  => "DELETE FROM time_accounting_version WHERE article_id = ?",
             Bind => [ \$ArticleVersionID ]
@@ -549,9 +572,6 @@ sub ArticleRestore {
         }
 
         $Kernel::OM->Get('Kernel::System::Ticket')->_TicketCacheClear( TicketID => $Param{TicketID} );
-    }
-
-    if ($Success) {
 
         # add history entry
         $Kernel::OM->Get('Kernel::System::Ticket')->HistoryAdd(
