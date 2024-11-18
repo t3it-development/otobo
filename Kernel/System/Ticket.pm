@@ -2,7 +2,7 @@
 # OTOBO is a web-based ticketing system for service organisations.
 # --
 # Copyright (C) 2001-2020 OTRS AG, https://otrs.com/
-# Copyright (C) 2019-2024 Rother OSS GmbH, https://otobo.de/
+# Copyright (C) 2019-2024 Rother OSS GmbH, https://otobo.io/
 # Copyright (C) 2012-2020 Znuny GmbH, http://znuny.com/
 # --
 # This program is free software: you can redistribute it and/or modify it under
@@ -6334,14 +6334,11 @@ sub TicketAccountTime {
     $Param{TimeUnit} = $DBObject->Quote( $Param{TimeUnit}, 'Number' );
 
     # db update
-
     $DBObject->Prepare(
         SQL   => 'SELECT id, time_unit FROM time_accounting WHERE article_id = ?',
         Bind  => [ \$Param{ArticleID} ],
         Limit => 1
     );
-
-    # fetch the data
     if ( my @Row = $DBObject->FetchrowArray() ) {
         my $ID = $Row[0];
         my $NewTimeUnit = $Row[1] + $Param{TimeUnit};
