@@ -778,13 +778,7 @@ sub _GetParam {
                 my $Message = $LayoutObject->{LanguageObject}->Translate( 'Process::Default%s Config Value missing!', $CurrentField );
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Message,
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Message,
                 );
             }
@@ -916,13 +910,7 @@ sub _OutputActivityDialog {
         my $Message = Translatable('Got no ProcessEntityID or TicketID and ActivityDialogEntityID!');
 
         # does not show header and footer again
-        if ( $Self->{IsMainWindow} ) {
-            return $LayoutObject->CustomerError(
-                Message => $Message,
-            );
-        }
-
-        $LayoutObject->CustomerFatalError(
+        return $LayoutObject->CustomerError(
             Message => $Message,
         );
     }
@@ -939,7 +927,6 @@ sub _OutputActivityDialog {
     # get needed objects
     my $ActivityObject       = $Kernel::OM->Get('Kernel::System::ProcessManagement::Activity');
     my $ActivityDialogObject = $Kernel::OM->Get('Kernel::System::ProcessManagement::ActivityDialog');
-    my $ProcessObject        = $Kernel::OM->Get('Kernel::System::ProcessManagement::Process');
     my $ConfigObject         = $Kernel::OM->Get('Kernel::Config');
 
     # no AJAX update in this part
@@ -983,13 +970,7 @@ sub _OutputActivityDialog {
         );
 
         # does not show header and footer again
-        if ( $Self->{IsMainWindow} ) {
-            return $LayoutObject->CustomerError(
-                Message => $Message,
-            );
-        }
-
-        $LayoutObject->CustomerFatalError(
+        return $LayoutObject->CustomerError(
             Message => $Message,
         );
     }
@@ -1005,13 +986,7 @@ sub _OutputActivityDialog {
         );
 
         # does not show header and footer again
-        if ( $Self->{IsMainWindow} ) {
-            return $LayoutObject->CustomerError(
-                Message => $Message,
-            );
-        }
-
-        $LayoutObject->CustomerFatalError(
+        return $LayoutObject->CustomerError(
             Message => $Message,
         );
     }
@@ -1106,7 +1081,6 @@ sub _OutputActivityDialog {
                         'Process::DynamicFieldProcessManagementProcessID'
                     )
                 },
-            IsMainWindow => $Self->{IsMainWindow},
             MainBoxClass => $MainBoxClass || '',
         },
     );
@@ -1218,13 +1192,7 @@ sub _OutputActivityDialog {
             );
 
             # does not show header and footer again
-            if ( $Self->{IsMainWindow} ) {
-                return $LayoutObject->CustomerError(
-                    Message => $Message,
-                );
-            }
-
-            $LayoutObject->CustomerFatalError(
+            return $LayoutObject->CustomerError(
                 Message => $Message,
             );
         }
@@ -1289,13 +1257,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1329,13 +1291,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1365,13 +1321,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1401,13 +1351,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1436,13 +1380,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1471,13 +1409,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1506,13 +1438,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1541,13 +1467,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
@@ -1579,13 +1499,7 @@ sub _OutputActivityDialog {
             if ( !$Response->{Success} ) {
 
                 # does not show header and footer again
-                if ( $Self->{IsMainWindow} ) {
-                    return $LayoutObject->CustomerError(
-                        Message => $Response->{Message},
-                    );
-                }
-
-                $LayoutObject->CustomerFatalError(
+                return $LayoutObject->CustomerError(
                     Message => $Response->{Message},
                 );
             }
