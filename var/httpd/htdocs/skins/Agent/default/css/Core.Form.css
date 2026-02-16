@@ -1177,7 +1177,7 @@ fieldset.ModularForm {
     }
 
     fieldset.ModularForm label[for="Subject"] {
-        padding: 5px;
+        padding: var(--label-padding);
         align-self: center;
     }
 
@@ -1300,6 +1300,10 @@ fieldset.ModularForm {
 
     fieldset.ModularForm .Field.AttachmentField {
         flex-direction: column;
+    }
+
+    fieldset.ModularForm .Field #OptionCustomer {
+        align-self: center;
     }
 
     fieldset.ModularForm div.Row {
