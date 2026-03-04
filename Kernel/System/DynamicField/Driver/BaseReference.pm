@@ -1232,6 +1232,7 @@ sub GetFieldState {
 
         # value holds object id(s) at this point
         my @CheckedValues;
+        my %PossibleValues;
         my $ValueChanged = 0;
         ITEM:
         for my $ValueItem ( $Value->@* ) {
@@ -1259,17 +1260,31 @@ sub GetFieldState {
                 $ValueChanged = 1;
             }
             else {
+                my %Description = $Self->ObjectDescriptionGet(
+                    DynamicFieldConfig => $DynamicFieldConfig,
+                    ObjectID           => $ValueItem,
+                );
+                $PossibleValues{$ValueItem} = $Description{Long};
                 push @CheckedValues, $ValueItem;
             }
+
+            $Kernel::OM->Get('Kernel::System::Web::FormCache')->SetFormData(
+                LayoutObject => $Kernel::OM->Get('Kernel::Output::HTML::Layout'),
+                Key          => 'PossibleValues_DynamicField_' . $DynamicFieldConfig->{Name},
+                Value        => \@CheckedValues,
+            );
         }
 
         if ($ValueChanged) {
             return (
-                NewValue => \@CheckedValues,
+                NewValue       => \@CheckedValues,
+                PossibleValues => \%PossibleValues,
             );
         }
 
-        return ();
+        return (
+            PossibleValues => \%PossibleValues,
+        );
     }
 
     # fetch possible values for dynamic field
