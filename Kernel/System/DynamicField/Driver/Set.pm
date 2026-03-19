@@ -859,9 +859,37 @@ sub GetFieldState {
 
     my %Return;
 
+    my $PassVisibility = 0;
+    if ( $Param{CachedVisibility} ) {
+        my $InnerField = ( keys $DynamicField->%* )[0];
+
+        # if we are not in the first run for this mask, we provide the cached visibility for the inner fields
+        if ( exists $Param{CachedVisibility}{"DynamicField_$InnerField\_0"} ) {
+            $PassVisibility = 1;
+        }
+    }
+
     for my $SetIndex ( 0 .. $#SetValue ) {
-        for my $Name ( sort keys $DynamicField->%* ) {
+        for my $Name ( keys $DynamicField->%* ) {
             $DFParam{"DynamicField_$Name"} = $SetValue[$SetIndex]{$Name};
+        }
+
+        my %IndexVisibility;
+
+        # if we have a cached visibility, we use it for set inner fields, too
+        if ( $PassVisibility ) {
+
+            # if the whole set is reappearing, we must treat all inner fields as reappearing
+            if ( $Param{CachedVisibility}{"DynamicField_$SetConfig->{Name}"} == 0 ) {
+                %IndexVisibility = map { 'DynamicField_' . $_ => 0 } keys $DynamicField->%*;
+            }
+
+            else {
+                for my $Name ( keys $DynamicField->%* ) {
+                    $IndexVisibility{"DynamicField_$Name"} =
+                        $Param{CachedVisibility}{"DynamicField_$Name\_$SetIndex"} // $Param{CachedVisibility}{"DynamicField_$Name\_Template"};
+                }
+            }
         }
 
         my $LoopProtection = 100;
@@ -873,12 +901,12 @@ sub GetFieldState {
                 %DFParam,
                 DynamicField => \%DFParam,
             },
-            LoopProtection     => \$LoopProtection,
-            PossibleValuesOnly => 1,
-            SetIndex           => $SetIndex,
+            LoopProtection   => \$LoopProtection,
+            SetIndex         => $SetIndex,
+            CachedVisibility => $PassVisibility ? \%IndexVisibility : undef,
         );
 
-        for my $Name ( sort keys $SetFieldStates{Fields}->%* ) {
+        for my $Name ( keys $SetFieldStates{Fields}->%* ) {
 
             my $SuffixedName = $Name . ( $SetConfig->{ProcessSuffix} || '' );
 
@@ -897,12 +925,31 @@ sub GetFieldState {
 
             # store the reduced possible values in this object for a possible subsequent EditFieldRender
             $Self->{PossibleValuesFilter}{ $SetConfig->{Name} }[$SetIndex]{ 'DynamicField_' . $Name } = $SetFieldStates{Fields}{$Name}{PossibleValues};
+
+            # the returned visibility will only be cached if the changed element affects visibility
+            # this will work on outer fields, but currently not properly on changes of inner fields
+            $Return{Visibility}{ 'DynamicField_' . $Name . '_' . $SetIndex } = $SetFieldStates{Visibility}{ 'DynamicField_' . $Name };
         }
     }
 
     if ( $SetConfig->{Config}{MultiValue} ) {
-        for my $Name ( sort keys $DynamicField->%* ) {
+        for my $Name ( keys $DynamicField->%* ) {
             $DFParam{"DynamicField_$Name"} = undef;
+        }
+
+        my %IndexVisibility;
+        if ( $PassVisibility ) {
+
+            # if the whole set is reappearing, we must treat all inner fields as reappearing
+            if ( $Param{CachedVisibility}{"DynamicField_$SetConfig->{Name}"} == 0 ) {
+                %IndexVisibility = map { 'DynamicField_' . $_ => 0 } keys $DynamicField->%*;
+            }
+
+            else {
+                for my $Name ( keys $DynamicField->%* ) {
+                    $IndexVisibility{"DynamicField_$Name"} = $Param{CachedVisibility}{"DynamicField_$Name\_Template"};
+                }
+            }
         }
 
         my $LoopProtection = 100;
@@ -914,8 +961,8 @@ sub GetFieldState {
                 %DFParam,
                 DynamicField => \%DFParam,
             },
-            LoopProtection     => \$LoopProtection,
-            PossibleValuesOnly => 1,
+            LoopProtection   => \$LoopProtection,
+            CachedVisibility => $PassVisibility ? \%IndexVisibility : undef,
         );
 
         for my $Name ( sort keys $SetFieldStates{Fields}->%* ) {
@@ -936,6 +983,8 @@ sub GetFieldState {
                 ?
                 $SetFieldStates{NewValues}{$Name}
                 : $DFParam{"DynamicField_$Name"};
+
+            $Return{Visibility}{ 'DynamicField_' . $Name . '_Template' } = $SetFieldStates{Visibility}{ 'DynamicField_' . $Name };
         }
     }
 
