@@ -925,10 +925,13 @@ sub GetFieldState {
 
             # store the reduced possible values in this object for a possible subsequent EditFieldRender
             $Self->{PossibleValuesFilter}{ $SetConfig->{Name} }[$SetIndex]{ 'DynamicField_' . $Name } = $SetFieldStates{Fields}{$Name}{PossibleValues};
+        }
+
+        for my $DFName ( keys $SetFieldStates{Visibility}->%* ) {
 
             # the returned visibility will only be cached if the changed element affects visibility
             # this will work on outer fields, but currently not properly on changes of inner fields
-            $Return{Visibility}{ 'DynamicField_' . $Name . '_' . $SetIndex } = $SetFieldStates{Visibility}{ 'DynamicField_' . $Name };
+            $Return{Visibility}{ $DFName . '_' . $SetIndex } = $SetFieldStates{Visibility}{ $DFName };
         }
     }
 
@@ -983,8 +986,11 @@ sub GetFieldState {
                 ?
                 $SetFieldStates{NewValues}{$Name}
                 : $DFParam{"DynamicField_$Name"};
+        }
 
-            $Return{Visibility}{ 'DynamicField_' . $Name . '_Template' } = $SetFieldStates{Visibility}{ 'DynamicField_' . $Name };
+
+        for my $DFName ( keys $SetFieldStates{Visibility}->%* ) {
+            $Return{Visibility}{ $DFName . '_Template' } = $SetFieldStates{Visibility}{ $DFName };
         }
     }
 
