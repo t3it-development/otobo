@@ -222,6 +222,7 @@ sub EditSectionRender {
                 CustomerInterface    => $Param{CustomerInterface},
                 Object               => $Param{Object},
                 Class                => $Class,
+                CachedVisibility     => $Param{Visibility},
                 %Error,
                 %InvisibleNoDefault,
             );

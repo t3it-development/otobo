@@ -136,6 +136,7 @@ sub ValueSet {
 
     my $DynamicFieldObject = $Kernel::OM->Get('Kernel::System::DynamicField');
     my $BackendObject      = $Kernel::OM->Get('Kernel::System::DynamicField::Backend');
+    my $ParamObject        = $Kernel::OM->Get('Kernel::System::Web::Request');
 
     my $Include      = $Param{DynamicFieldConfig}{Config}{Include};
     my $DynamicField = $Self->_GetIncludedDynamicFields(
@@ -145,11 +146,84 @@ sub ValueSet {
 
     return if !$DynamicField;
 
+    # if we've been coming via some form, parts may be invisible
+    my @HiddenFields;
+
+    my $FormID = $ParamObject->GetParam( Param => 'FormID' );
+    if( $FormID ) {
+
+        # get visibility from cache
+        my $CacheObject = $Kernel::OM->Get('Kernel::System::Cache');
+        my $Visibility  = $CacheObject->{CacheObject}->Get(
+            Type => 'HiddenFields',
+            Key  => $FormID,
+        );
+
+        # check if any of our Set inner fields are hidden
+        for my $DFName ( keys $DynamicField->%* ) {
+
+            my $Fullname = "DynamicField_$DFName";
+            if ( exists $Visibility->{$Fullname} && $Visibility->{$Fullname} == 0 ) {
+
+                push @HiddenFields, $DFName;
+            }
+        }
+    }
+
     for my $Name ( sort keys $DynamicField->%* ) {
 
-        # The values for an included dynamic field are the values from the respective column
+        # the values for an included dynamic field are the values from the respective column
         my @FieldValue = map { $_->{$Name} } @SetValue;
 
+        # check if this set field is hidden
+        my $IsHidden = grep { $_ eq $Name } @HiddenFields;
+        if($IsHidden) {
+
+            # restore hidden field values from old values
+            my $OldValues = $BackendObject->ValueGet(
+                %Param,
+                DynamicFieldConfig => $DynamicField->{$Name},
+                Set                => 1,
+                ObjectName         => undef,
+            );
+
+            my $IndexMax = $#FieldValue;
+
+            # gather OriginSetIndex values
+            # to detect if we had delete/append operations
+            my @OriginSetIndex = $ParamObject->GetArray(
+                Param => 'OriginSetIndex_' . $Param{DynamicFieldConfig}->{Name},
+            );
+
+            for my $Index ( 0 .. $IndexMax ) {
+
+                my $OriginIndex = $OriginSetIndex[$Index];
+
+                if ( $OriginIndex == $Index ) {
+
+                    # index is still at original position,
+                    # no delete/append happend
+                    # but since the field is hidden,
+                    # replace the incoming value
+                    $FieldValue[$Index] = $OldValues->[$Index];
+                }
+                elsif ( $OriginIndex == -1 ) {
+
+                    # index did not exist initially,
+                    # value is result of append,
+                    # make sure hidden field gets empty value
+                    $FieldValue[$Index] = undef;
+                }
+                else {
+                    # index has moved due to delete/append
+                    # so replace incoming value with the
+                    # value from DB at the *original* index
+                    $FieldValue[$Index] = $OldValues->[$OriginIndex];
+                }
+            }
+        }
+
+        # finally store the value
         if (
             !$BackendObject->ValueSet(
                 %Param,
@@ -292,10 +366,17 @@ sub EditFieldRender {
         }
     }
 
+    if($Param{CachedVisibility}) {
+         %Visibility = (
+            %Visibility,
+            $Param{CachedVisibility}->%*,
+         );
+    }
+
     for my $SetIndex ( 0 .. $#SetValue ) {
         my %Value;
         for my $Name ( sort keys $DynamicField->%* ) {
-            $Value{"DynamicField_$Name"}          = $SetValue[$SetIndex]{$Name};
+            $Value{"DynamicField_$Name"}          = $Visibility{"DynamicField_$Name"} ? $SetValue[$SetIndex]{$Name} : undef;
             $DynamicField->{$Name}{Name}          = $Name . ( $Param{DynamicFieldConfig}{ProcessSuffix} // '' ) . '_' . $SetIndex;
             $DynamicField->{$Name}{ProcessSuffix} = $Param{DynamicFieldConfig}{ProcessSuffix};
         }
@@ -323,6 +404,7 @@ sub EditFieldRender {
             Data         => {
                 Name             => $Param{DynamicFieldConfig}->{Name},
                 Index            => $SetIndex,
+                OriginIndex      => $SetIndex,
                 DynamicFieldHTML => $DynamicFieldHTML,
             },
         );
@@ -349,6 +431,7 @@ sub EditFieldRender {
             ParamObject        => $Param{ParamObject},
             DynamicFieldValues => \%TemplateValues,
             CustomerInterface  => $Param{CustomerInterface},
+            Visibility           => \%Visibility,
 
             # can be set by preceding GetFieldState()
             PossibleValuesFilter => $Self->{PossibleValuesFilter}{ $Param{DynamicFieldConfig}->{Name} }[ $#SetValue + 1 ] // {},
@@ -360,6 +443,7 @@ sub EditFieldRender {
             Data         => {
                 Name             => $Param{DynamicFieldConfig}->{Name},
                 Index            => 'Template',
+                OriginIndex      => -1,
                 DynamicFieldHTML => $DynamicFieldHTML,
             },
         );
@@ -870,6 +954,7 @@ sub GetFieldState {
     }
 
     for my $SetIndex ( 0 .. $#SetValue ) {
+
         for my $Name ( keys $DynamicField->%* ) {
             $DFParam{"DynamicField_$Name"} = $SetValue[$SetIndex]{$Name};
         }
@@ -930,8 +1015,11 @@ sub GetFieldState {
         for my $DFName ( keys $SetFieldStates{Visibility}->%* ) {
 
             # the returned visibility will only be cached if the changed element affects visibility
-            # this will work on outer fields, but currently not properly on changes of inner fields
+
+            # ajax visibility
             $Return{Visibility}{ $DFName . '_' . $SetIndex } = $SetFieldStates{Visibility}{ $DFName };
+            # initial render visibility
+            $Return{Visibility}{ $DFName } = $SetFieldStates{Visibility}{ $DFName };
         }
     }
 
