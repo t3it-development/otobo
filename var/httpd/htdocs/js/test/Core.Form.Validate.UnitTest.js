@@ -650,10 +650,16 @@ Core.Form.Validate = (function (Namespace) {
             var $TestForm = $('<form id="TestForm" class="Validate"></form>');
 
             $TestForm.append('<label class="Mandatory" for="ObjectOne"><span class="Marker">*</span>ObjectOne</label>');
-            $TestForm.append('<input type="text" value="" id="ObjectOne" name="ObjectOne"/>');
+            $TestForm.append('<input type="text" value="" id="ObjectOne" name="ObjectOne" aria-describedby="ObjectOneHelp"/>');
+            $TestForm.append('<input type="text" value="" id="ObjectOne_Search" aria-describedby="ObjectOneSearchHelp"/>');
+            $TestForm.append('<div id="ObjectOneHelp">Help for ObjectOne</div>');
+            $TestForm.append('<div id="ObjectOneSearchHelp">Help for ObjectOne search</div>');
+            $TestForm.append('<div id="ObjectOneError" class="TooltipErrorMessage"><p>ObjectOne is invalid</p></div>');
             $TestForm.append('<label class="Mandatory" for="ObjectTwo"><span class="Marker">*</span>ObjectTwo</label>');
             $TestForm.append('<input type="text" value="" id="ObjectTwo" name="ObjectTwo" class="ServerError"/>');
+            $TestForm.append('<div id="ObjectTwoServerError" class="TooltipErrorMessage"><p>ObjectTwo is invalid</p></div>');
             $('body').append($TestForm);
+            $('#ObjectOne').data('modernized', 'ObjectOne_Search');
 
             /*
              * Run the tests
@@ -661,7 +667,7 @@ Core.Form.Validate = (function (Namespace) {
 
             Core.Form.Validate.Init();
 
-            Assert.expect(15);
+            Assert.expect(28);
 
             // Test HighlightError()
             Assert.equal($('#ObjectOne').hasClass('Error'), false, 'No Error class before HighlightError() for Error type');
@@ -669,22 +675,33 @@ Core.Form.Validate = (function (Namespace) {
             Core.Form.Validate.HighlightError($('#ObjectOne'), 'Error');
             Assert.equal($('#ObjectOne').hasClass('Error'), true, 'Error class after HighlightError() for Error type');
             Assert.equal($('#ObjectOne').attr('aria-invalid'), "true", 'Attribute aria-invalid is true after HighlightError() for Error type');
+            Assert.equal($('#ObjectOne').attr('aria-describedby'), 'ObjectOneHelp ObjectOneError', 'Error message is added to aria-describedby without replacing an existing description');
+            Assert.equal($('#ObjectOne_Search').attr('aria-invalid'), "true", 'Visible input proxy is marked invalid');
+            Assert.equal($('#ObjectOne_Search').attr('aria-describedby'), 'ObjectOneSearchHelp ObjectOneError', 'Visible input proxy references the error without replacing its existing description');
+            Assert.equal($('#ObjectOneError').hasClass('AccessibilityErrorActive'), true, 'Client error message is exposed to assistive technology');
             Assert.equal($('#TestForm').find("label[for=ObjectOne]").hasClass('LabelError'), false, 'No LabelError class for label after HighlightError() for Error type');
 
             // For ServerError type HighlightError() is done in Core.Form.Validate.Init()
             Assert.equal($('#ObjectTwo').hasClass('Error'), true, 'Error class after HighlightError() for ServerError type');
             Assert.equal($('#ObjectTwo').attr('aria-invalid'), "true", 'Attribute aria-invalid is true after HighlightError() for ServerError type');
+            Assert.equal($('#ObjectTwo').attr('aria-describedby'), 'ObjectTwoServerError', 'Server error message is added to aria-describedby');
+            Assert.equal($('#ObjectTwoServerError').hasClass('AccessibilityErrorActive'), true, 'Server error message is exposed to assistive technology');
             Assert.equal($('#TestForm').find("label[for=ObjectTwo]").hasClass('LabelError'), true, 'LabelError class for label after HighlightError() for ServerError type');
 
             // Test UnHighlightError()
             Core.Form.Validate.UnHighlightError($('#ObjectOne'));
             Assert.equal($('#ObjectOne').hasClass('Error'), false, 'No Error class after UnHighlightError() for Error type');
             Assert.equal($('#ObjectOne').attr('aria-invalid'), "false", 'Attribute aria-invalid is false after UnHighlightError() for Error type');
+            Assert.equal($('#ObjectOne').attr('aria-describedby'), 'ObjectOneHelp', 'Validation message is removed from aria-describedby while the existing description is preserved');
+            Assert.equal($('#ObjectOne_Search').attr('aria-invalid'), "false", 'Visible input proxy is marked valid');
+            Assert.equal($('#ObjectOne_Search').attr('aria-describedby'), 'ObjectOneSearchHelp', 'Validation message is removed from the input proxy without removing its existing description');
+            Assert.equal($('#ObjectOneError').hasClass('AccessibilityErrorActive'), false, 'Client error message is hidden after validation succeeds');
 
             // For ServerError type, we need to change field value to remove error class
             Core.Form.Validate.UnHighlightError($('#ObjectTwo'));
             Assert.equal($('#ObjectTwo').hasClass('Error'), true, 'Error class after UnHighlightError() for ServerError type');
             Assert.equal($('#ObjectTwo').attr('aria-invalid'), "true", 'Attribute aria-invalid is true after UnHighlightError() for ServerError type');
+            Assert.equal($('#ObjectTwo').attr('aria-describedby'), 'ObjectTwoServerError', 'Server error description remains until the field value changes');
             Assert.equal($('#TestForm').find("label[for=ObjectTwo]").hasClass('LabelError'), true, 'LabelError class for label after UnHighlightError() for ServerError type');
 
             $('#ObjectTwo').val('abc');
@@ -692,10 +709,39 @@ Core.Form.Validate = (function (Namespace) {
 
             Assert.equal($('#ObjectTwo').hasClass('Error'), false, 'No Error class after inputed value for ServerError type');
             Assert.equal($('#ObjectTwo').attr('aria-invalid'), "false", 'Attribute aria-invalid is false after inputed value for ServerError type');
+            Assert.strictEqual($('#ObjectTwo').attr('aria-describedby'), undefined, 'Server error description is removed after the field value changes');
+            Assert.equal($('#ObjectTwoServerError').hasClass('AccessibilityErrorActive'), false, 'Server error message is hidden after the field value changes');
             Assert.equal($('#TestForm').find("label[for=ObjectTwo]").hasClass('LabelError'), false, 'No LabelError class for label after inputed value for ServerError type');
 
             // Cleanup div container and contents
             $('#TestForm').remove();
+        });
+
+        QUnit.test('Invalid form is announced once', function(Assert){
+            var AlertCount = 0,
+                AlertText,
+                OriginalAudibleAlert = Core.UI.Accessibility.AudibleAlert,
+                $TestForm = $('<form id="TestFormAnnouncement" class="Validate"></form>');
+
+            Assert.expect(2);
+
+            $TestForm.append('<input type="text" id="AnnouncementField" name="AnnouncementField" class="Validate_Required"/>');
+            $TestForm.append('<div id="AnnouncementFieldError" class="TooltipErrorMessage"><p>Required</p></div>');
+            $('body').append($TestForm);
+
+            Core.UI.Accessibility.AudibleAlert = function (Text) {
+                AlertCount++;
+                AlertText = Text;
+            };
+
+            Core.Form.Validate.Init();
+            $TestForm.trigger('submit');
+
+            Assert.equal(AlertCount, 1, 'Invalid form produces one global announcement');
+            Assert.equal(AlertText, Core.Language.Translate('One or more errors occurred!'), 'Global announcement uses the translated error summary');
+
+            Core.UI.Accessibility.AudibleAlert = OriginalAudibleAlert;
+            $TestForm.remove();
         });
 
     };

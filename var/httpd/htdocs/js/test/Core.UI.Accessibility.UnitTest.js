@@ -43,7 +43,7 @@ Core.UI.Accessibility = (function (Namespace) {
              */
             Core.UI.Accessibility.Init();
 
-            Assert.expect(8);
+            Assert.expect(11);
 
             Assert.equal($('.ARIARoleBanner')
                 .attr('role'), 'banner', 'Role banner');
@@ -61,12 +61,47 @@ Core.UI.Accessibility = (function (Namespace) {
                 .attr('aria-required'), 'true', 'ARIA required attribute');
             Assert.equal($('.Validate_DependingRequiredAND')
                 .attr('aria-required'), 'true', 'ARIA required attribute');
+            Assert.equal($('#Accessibility_AlertMessage').length, 1, 'Global alert region exists');
+            Assert.equal($('#Accessibility_AlertMessage').attr('role'), 'alert', 'Global alert region has alert role');
+            Assert.equal($('#Accessibility_AlertMessage').attr('aria-atomic'), 'true', 'Global alert region is atomic');
 
 
             /*
              * Cleanup div container and contents
              */
             $('#OTOBO_UI_Accessibility_UnitTest').remove();
+        });
+
+        QUnit.test('Core.UI.Accessibility.AudibleAlert()', function(Assert){
+            var Done = Assert.async(),
+                AlertElement = $('#Accessibility_AlertMessage')[0];
+
+            Assert.expect(4);
+
+            Assert.equal(
+                Core.UI.Accessibility.AudibleAlert('<strong>Error</strong>'),
+                true,
+                'A non-empty alert is accepted'
+            );
+            Assert.strictEqual(
+                $('#Accessibility_AlertMessage')[0],
+                AlertElement,
+                'Existing live region is reused'
+            );
+
+            window.setTimeout(function () {
+                Assert.equal(
+                    $('#Accessibility_AlertMessage').text(),
+                    '<strong>Error</strong>',
+                    'Alert is inserted as plain text'
+                );
+                Assert.equal(
+                    $('#Accessibility_AlertMessage').children().length,
+                    0,
+                    'Alert text does not create markup'
+                );
+                Done();
+            }, 10);
         });
     };
 

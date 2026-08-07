@@ -28,6 +28,36 @@ Core.UI = Core.UI || {};
  */
 Core.UI.Accessibility = (function (TargetNS) {
 
+    var AlertMessageID = 'Accessibility_AlertMessage',
+        AlertTimeout;
+
+    /**
+     * @private
+     * @name GetAlertMessage
+     * @memberof Core.UI.Accessibility
+     * @function
+     * @returns {jQueryObject} The global alert message element.
+     * @description
+     *      Creates the live region once and keeps it in the DOM so that updates
+     *      are announced reliably by assistive technology.
+     */
+    function GetAlertMessage() {
+        var $AlertMessage = $('#' + AlertMessageID);
+
+        if (!$AlertMessage.length) {
+            $AlertMessage = $('<div />')
+                .attr({
+                    id: AlertMessageID,
+                    role: 'alert',
+                    'aria-atomic': 'true'
+                })
+                .addClass('ARIAAlertMessage')
+                .appendTo('body');
+        }
+
+        return $AlertMessage;
+    }
+
     /**
      * @name Init
      * @memberof Core.UI.Accessibility
@@ -54,6 +84,7 @@ Core.UI.Accessibility = (function (TargetNS) {
         $('.Validate_Required, .Validate_DependingRequiredAND, .Validate_DependingRequiredOR')
             .attr('aria-required', 'true');
 
+        GetAlertMessage();
         TargetNS.AccessibleNavigation();
     };
 
@@ -97,19 +128,27 @@ Core.UI.Accessibility = (function (TargetNS) {
      * @param {String} Text - Text to be spoken to the user, may not contain markup.
      * @description
      *      This function receives a text to be spoken to users
-     *      using a screenreader. This is achieved by creating an
-     *      element with the aria landmark role "alert" causing it
+     *      using a screenreader. This is achieved by updating an
+     *      element with the ARIA role "alert", causing it
      *      to be read immediately.
      */
     TargetNS.AudibleAlert = function (Text) {
-        var AlertMessageID = 'Accessibility_AlertMessage';
+        var $AlertMessage;
 
-        // remove possibly pre-existing alert message
-        $('#' + AlertMessageID).remove();
+        if (typeof Text !== 'string' || !Text.length) {
+            return false;
+        }
 
-        // add new alert message
-        $('body').append('<div role="alert" id="' + AlertMessageID + '" class="ARIAAlertMessage">' + Text + '</div>');
+        $AlertMessage = GetAlertMessage();
+        window.clearTimeout(AlertTimeout);
+        $AlertMessage.text('');
 
+        // Updating an existing live region makes repeated messages announceable.
+        AlertTimeout = window.setTimeout(function () {
+            $AlertMessage.text(Text);
+        }, 0);
+
+        return true;
     };
 
     Core.Init.RegisterNamespace(TargetNS, 'APP_GLOBAL');

@@ -238,9 +238,11 @@ Core.Form.ErrorTooltips = (function (TargetNS) {
      *      This function shows the tooltip for a rich text editor.
      */
     function ShowRTETooltip(Event) {
-        if ( typeof window.editor != 'undefined' ) {
-            document.querySelector('.ck-editor__editable').id = 'EditorBox';
-            TargetNS.ShowTooltip($('#EditorBox'), Event.Message);
+        var $EditableElement;
+
+        if (Event.Editor && Event.Editor.ui) {
+            $EditableElement = $(Event.Editor.ui.getEditableElement());
+            TargetNS.ShowTooltip($EditableElement, Event.Message);
         }
     }
 
@@ -262,20 +264,21 @@ Core.Form.ErrorTooltips = (function (TargetNS) {
      * @function
      * @param {jQueryObject} $Element - The RTE element for whom the tooltips are initialized.
      * @param {String} Message - The string content that will be show in tooltip.
+     * @param {Object} Editor - The rich text editor instance.
      * @description
      *      This function initializes the necessary stuff for a tooltip in a rich text editor.
      */
-    TargetNS.InitRTETooltip = function ($Element, Message) {
+    TargetNS.InitRTETooltip = function ($Element, Message, Editor) {
 
         var ElementID = $Element.attr('id');
 
-        if ( typeof window.editor === 'undefined' ) {
+        if (!Editor || !Editor.ui) {
             return false;
         }
 
-        window.editor.ui.focusTracker.on( 'change:isFocused', ( evt, name, isFocused ) => {
+        Editor.ui.focusTracker.on( 'change:isFocused', ( evt, name, isFocused ) => {
             if ( isFocused && $Element.val() == "" ) {
-                ShowRTETooltip({ElementID: ElementID, Message: Message});
+                ShowRTETooltip({ElementID: ElementID, Message: Message, Editor: Editor});
             }
         } );
     };

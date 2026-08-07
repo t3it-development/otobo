@@ -752,7 +752,8 @@ Core.UI.RichTextEditor = (function (TargetNS) {
      *      This function focusses the given RTE.
      */
     TargetNS.Focus = function ($EditorArea) {
-        var EditorID = '';
+        var EditorID = '',
+            Editor;
 
         if (isJQueryObject($EditorArea) && $EditorArea.length === 1) {
             EditorID = $EditorArea.attr('id');
@@ -762,8 +763,9 @@ Core.UI.RichTextEditor = (function (TargetNS) {
             Core.Exception.Throw('RichTextEditor: Need exactly one EditorArea!', 'TypeError');
         }
 
-        if (typeof ClassicEditor != 'undefined') {
-            CKEditorInstances[$EditorArea.attr('id')].focus();
+        Editor = CKEditorInstances[EditorID];
+        if (Editor && Editor.editing && Editor.editing.view) {
+            Editor.editing.view.focus();
         }
     };
 

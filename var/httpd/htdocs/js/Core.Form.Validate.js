@@ -73,6 +73,218 @@ Core.Form.Validate = (function (TargetNS) {
     }
 
     /**
+     * @private
+     * @name GetAccessibilityElements
+     * @memberof Core.Form.Validate
+     * @function
+     * @returns {jQueryObject} The source field and any visible editor or input proxy.
+     * @param {jQueryObject} $Element - The validated form element.
+     * @description
+     *      OTOBO replaces some form elements with custom controls. ARIA validation
+     *      state must be applied to the element which actually receives focus.
+     */
+    function GetAccessibilityElements($Element) {
+        var $AccessibilityElements = $Element,
+            ModernizedID = $Element.data('modernized'),
+            Editor;
+
+        if (ModernizedID) {
+            $AccessibilityElements = $AccessibilityElements.add(
+                '#' + Core.App.EscapeSelector(ModernizedID)
+            );
+        }
+
+        if ($Element.hasClass('RichText')) {
+            $AccessibilityElements = $AccessibilityElements.add(
+                $Element
+                    .closest('.RichTextField, .RichTextHolder')
+                    .find('.ck-editor__editable')
+                    .first()
+            );
+        }
+
+        if ($Element.hasClass('CodeMirrorEditor')) {
+            Editor = $Element.data('CodeMirrorInstance');
+            if (Editor && $.isFunction(Editor.getInputField)) {
+                $AccessibilityElements = $AccessibilityElements.add(Editor.getInputField());
+            }
+        }
+
+        return $AccessibilityElements;
+    }
+
+    /**
+     * @private
+     * @name AddErrorMessageReference
+     * @memberof Core.Form.Validate
+     * @function
+     * @param {jQueryObject} $Elements - The elements representing a validation field.
+     * @param {String} ErrorMessageID - The ID of the element containing the error message.
+     * @description
+     *      Connects an invalid field to its error message for assistive technology.
+     */
+    function AddErrorMessageReference($Elements, ErrorMessageID) {
+        $('#' + Core.App.EscapeSelector(ErrorMessageID)).addClass('AccessibilityErrorActive');
+
+        $Elements.each(function () {
+            var $Element = $(this),
+                DescribedBy = $Element.attr('aria-describedby') || '',
+                DescribedByIDs = DescribedBy.split(/\s+/).filter(Boolean),
+                ReferenceAdded = false;
+
+            if (DescribedByIDs.indexOf(ErrorMessageID) === -1) {
+                DescribedByIDs.push(ErrorMessageID);
+                $Element.attr('aria-describedby', DescribedByIDs.join(' '));
+                ReferenceAdded = true;
+            }
+
+            $Element
+                .data('ValidateErrorMessageID', ErrorMessageID)
+                .data('ValidateErrorMessageReferenceAdded', ReferenceAdded);
+        });
+    }
+
+    /**
+     * @private
+     * @name RemoveErrorMessageReference
+     * @memberof Core.Form.Validate
+     * @function
+     * @param {jQueryObject} $Elements - The elements representing a validation field.
+     * @description
+     *      Removes the error-message reference added by this module while preserving
+     *      other descriptions belonging to the field.
+     */
+    function RemoveErrorMessageReference($Elements) {
+        $Elements.each(function () {
+            var $Element = $(this),
+                ErrorMessageID = $Element.data('ValidateErrorMessageID'),
+                DescribedBy,
+                DescribedByIDs;
+
+            if (!ErrorMessageID) {
+                return;
+            }
+
+            $('#' + Core.App.EscapeSelector(ErrorMessageID)).removeClass('AccessibilityErrorActive');
+
+            if ($Element.data('ValidateErrorMessageReferenceAdded')) {
+                DescribedBy = $Element.attr('aria-describedby') || '';
+                DescribedByIDs = DescribedBy.split(/\s+/).filter(function (ID) {
+                    return ID && ID !== ErrorMessageID;
+                });
+
+                if (DescribedByIDs.length) {
+                    $Element.attr('aria-describedby', DescribedByIDs.join(' '));
+                }
+                else {
+                    $Element.removeAttr('aria-describedby');
+                }
+            }
+
+            $Element
+                .removeData('ValidateErrorMessageID')
+                .removeData('ValidateErrorMessageReferenceAdded');
+        });
+    }
+
+    /**
+     * @private
+     * @name AddRichTextErrorMessageReference
+     * @memberof Core.Form.Validate
+     * @function
+     * @param {Object} Editor - The CKEditor instance.
+     * @param {String} ErrorMessageID - The ID of the element containing the error message.
+     * @description
+     *      Adds validation attributes through CKEditor's view writer. Attributes
+     *      written only to the editable DOM element are lost when CKEditor renders it.
+     */
+    function AddRichTextErrorMessageReference(Editor, ErrorMessageID) {
+        var ViewRoot,
+            $EditorElement,
+            DescribedBy,
+            DescribedByIDs,
+            ReferenceAdded = false;
+
+        if (!Editor || !Editor.editing || !Editor.editing.view || !Editor.ui) {
+            return;
+        }
+
+        ViewRoot = Editor.editing.view.document.getRoot();
+        $EditorElement = $(Editor.ui.getEditableElement());
+        DescribedBy = ViewRoot.getAttribute('aria-describedby') || '';
+        DescribedByIDs = DescribedBy.split(/\s+/).filter(Boolean);
+        ReferenceAdded = Boolean(
+            $EditorElement.data('ValidateErrorMessageID') === ErrorMessageID
+            && $EditorElement.data('ValidateErrorMessageReferenceAdded')
+        );
+
+        if (DescribedByIDs.indexOf(ErrorMessageID) === -1) {
+            DescribedByIDs.push(ErrorMessageID);
+            ReferenceAdded = true;
+        }
+
+        Editor.editing.view.change(function (Writer) {
+            Writer.setAttribute('aria-invalid', 'true', ViewRoot);
+            Writer.setAttribute('aria-describedby', DescribedByIDs.join(' '), ViewRoot);
+        });
+
+        $EditorElement
+            .data('ValidateErrorMessageID', ErrorMessageID)
+            .data('ValidateErrorMessageReferenceAdded', ReferenceAdded);
+    }
+
+    /**
+     * @private
+     * @name RemoveRichTextErrorMessageReference
+     * @memberof Core.Form.Validate
+     * @function
+     * @param {Object} Editor - The CKEditor instance.
+     * @description
+     *      Removes validation attributes through CKEditor's view writer while
+     *      preserving descriptions which do not belong to form validation.
+     */
+    function RemoveRichTextErrorMessageReference(Editor) {
+        var ViewRoot,
+            $EditorElement,
+            ErrorMessageID,
+            DescribedBy,
+            DescribedByIDs;
+
+        if (!Editor || !Editor.editing || !Editor.editing.view || !Editor.ui) {
+            return;
+        }
+
+        ViewRoot = Editor.editing.view.document.getRoot();
+        $EditorElement = $(Editor.ui.getEditableElement());
+        ErrorMessageID = $EditorElement.data('ValidateErrorMessageID');
+
+        Editor.editing.view.change(function (Writer) {
+            Writer.setAttribute('aria-invalid', 'false', ViewRoot);
+
+            if (ErrorMessageID && $EditorElement.data('ValidateErrorMessageReferenceAdded')) {
+                DescribedBy = ViewRoot.getAttribute('aria-describedby') || '';
+                DescribedByIDs = DescribedBy.split(/\s+/).filter(function (ID) {
+                    return ID && ID !== ErrorMessageID;
+                });
+
+                if (DescribedByIDs.length) {
+                    Writer.setAttribute('aria-describedby', DescribedByIDs.join(' '), ViewRoot);
+                }
+                else {
+                    Writer.removeAttribute('aria-describedby', ViewRoot);
+                }
+            }
+        });
+
+        $EditorElement
+            .removeData('ValidateErrorMessageID')
+            .removeData('ValidateErrorMessageReferenceAdded');
+    }
+    // #---------------------------------------------------
+    // #       BaFinSkin (TASK-2026-00493) - ENDS
+    // #---------------------------------------------------
+
+    /**
      * @name HighlightError
      * @memberof Core.Form.Validate
      * @function
@@ -84,8 +296,10 @@ Core.Form.Validate = (function (TargetNS) {
      */
     TargetNS.HighlightError = function (Element, ErrorType) {
         var $Element = $(Element),
-            InputErrorMessageHTML,
-            InputErrorMessageText;
+            $AccessibilityElements,
+            RichTextEditor,
+            InputErrorMessageID,
+            InputErrorMessageHTML;
 
         // Check error type and correct it, if necessary
         if (ErrorType !== 'Error' && ErrorType !== 'ServerError') {
@@ -128,6 +342,14 @@ Core.Form.Validate = (function (TargetNS) {
         // Check if the element has already an error class
         // (that means, this function call is an additional call)
         if ($Element.hasClass(Options.ErrorClass)) {
+            if ($Element.hasClass('RichText') && typeof CKEditorInstances !== 'undefined') {
+                RichTextEditor = CKEditorInstances[$Element.attr('id')];
+                AddRichTextErrorMessageReference(
+                    RichTextEditor,
+                    $Element.attr('id') + ErrorType
+                );
+            }
+
             return false;
         }
 
@@ -135,8 +357,9 @@ Core.Form.Validate = (function (TargetNS) {
         $Element.addClass(Options.ErrorClass).triggerHandler('error.InputField');
         $(Element.form).find("label[for=" + Core.App.EscapeSelector(Element.id) + "]").addClass(Options.ErrorLabelClass);
 
-        // mark field as invalid for screenreader users
-        $Element.attr('aria-invalid', true);
+        // mark the source field and the actual interactive control as invalid
+        $AccessibilityElements = GetAccessibilityElements($Element);
+        $AccessibilityElements.attr('aria-invalid', true);
 
         // save value of element for a later check if field value was changed.
         // if the field has a servererror class and the value was not changed,
@@ -150,34 +373,61 @@ Core.Form.Validate = (function (TargetNS) {
 
         // Get the target element and find the associated hidden div with the
         // error message.
-        InputErrorMessageHTML = $('#' + Core.App.EscapeSelector($Element.attr('id')) + ErrorType).html();
-        InputErrorMessageText = $('#' + Core.App.EscapeSelector($Element.attr('id')) + ErrorType + ' > p').first().html();
+        InputErrorMessageID = $Element.attr('id') + ErrorType;
+        InputErrorMessageHTML = $('#' + Core.App.EscapeSelector(InputErrorMessageID)).html();
 
         if (InputErrorMessageHTML && InputErrorMessageHTML.length) {
-            // If error field is a RTE, it is a little bit more difficult.
-            if ( $Element.hasClass('RichText') && typeof ClassicEditor != 'undefined') {
-                Core.Form.ErrorTooltips.InitRTETooltip($Element, InputErrorMessageHTML);
+            AddErrorMessageReference($AccessibilityElements, InputErrorMessageID);
+
+            // Rich text editors replace the source textarea asynchronously.
+            if ($Element.hasClass('RichText')) {
+                if (typeof CKEditorInstances !== 'undefined') {
+                    RichTextEditor = CKEditorInstances[$Element.attr('id')];
             }
-            // If server error field is RTE, action must be subscribed and loaded when event is finished because RTE is not loaded yet.
-            else if ($Element.hasClass('RichText') && parseInt(Core.Config.Get('RichTextSet'), 10) === 1 )
+                if (
+                    GetAccessibilityElements($Element).length > 1
+                    && RichTextEditor
+                    )
             {
-                Core.App.Subscribe('Event.UI.RichTextEditor.InstanceReady', function () {
-                    Core.Form.ErrorTooltips.InitRTETooltip($Element, InputErrorMessageHTML);
+                    AddRichTextErrorMessageReference(RichTextEditor, InputErrorMessageID);
+                    Core.Form.ErrorTooltips.InitRTETooltip($Element, InputErrorMessageHTML, RichTextEditor);
+                }
+                else {
+                    Core.App.Subscribe('Event.UI.RichTextEditor.InstanceCreated', function (Editor) {
+                        if (!Editor || Editor.sourceElement !== $Element[0]) {
+                            return;
+                        }
+                        if (!$Element.hasClass(Options.ErrorClass)) {
+                            return;
+                        }
+
+                        AddRichTextErrorMessageReference(Editor, InputErrorMessageID);
+                        Core.Form.ErrorTooltips.InitRTETooltip($Element, InputErrorMessageHTML, Editor);
                 });
+            }
             }
             else if ($Element.hasClass('CodeMirrorEditor')) {
-                Core.App.Subscribe('Event.UI.CodeMirrorEditor.InstanceReady', function () {
-                    var Editor = arguments[0];
+                if ($Element.data('CodeMirrorInstance')) {
+                    Core.Form.ErrorTooltips.InitCMETooltip(
+                        $Element.data('CodeMirrorInstance'),
+                        InputErrorMessageHTML
+                    );
+                }
+                else {
+                    Core.App.Subscribe('Event.UI.CodeMirrorEditor.InstanceReady', function (Editor) {
+                        if (!$Element.hasClass(Options.ErrorClass)) {
+                            return;
+                        }
+                        $(Editor.getInputField()).attr('aria-invalid', true);
+                        AddErrorMessageReference($(Editor.getInputField()), InputErrorMessageID);
                     Core.Form.ErrorTooltips.InitCMETooltip(Editor, InputErrorMessageHTML);
                 });
+            }
             }
             else {
                 Core.Form.ErrorTooltips.InitTooltip($Element, InputErrorMessageHTML);
             }
         }
-
-        // speak the error message for screen reader users
-        Core.UI.Accessibility.AudibleAlert(InputErrorMessageText);
 
         // if the element is within a collapsed widget, expand that widget to show the error message to the user
         if ($Element.closest('.WidgetSimple.Collapsed').find('.WidgetAction.Toggle > a').length) {
@@ -223,8 +473,19 @@ Core.Form.Validate = (function (TargetNS) {
                 $(Element.form).find("label[for=" + Core.App.EscapeSelector(Element.id) + "]").removeClass(Options.ErrorLabelClass);
             }
 
-            // mark field as valid for screenreader users
-            $Element.attr('aria-invalid', false);
+            if (
+                $Element.hasClass('RichText')
+                && typeof CKEditorInstances !== 'undefined'
+                )
+            {
+                RemoveRichTextErrorMessageReference(
+                    CKEditorInstances[$Element.attr('id')]
+                );
+            }
+
+            // mark the source field and the actual interactive control as valid
+            GetAccessibilityElements($Element).attr('aria-invalid', false);
+            RemoveErrorMessageReference(GetAccessibilityElements($Element));
 
             // if error field is a RTE, it is a little bit more difficult
             if ( $Element.hasClass('RichText') ) {
@@ -250,6 +511,21 @@ Core.Form.Validate = (function (TargetNS) {
      */
     function OnErrorElement() {
         return true;
+    }
+
+    /**
+     * @private
+     * @name OnInvalidForm
+     * @memberof Core.Form.Validate
+     * @function
+     * @description
+     *      Announces one summary when submission is blocked. Field-specific
+     *      messages remain available through aria-describedby.
+     */
+    function OnInvalidForm() {
+        Core.UI.Accessibility.AudibleAlert(
+            Core.Language.Translate('One or more errors occurred!')
+        );
     }
 
     /**
@@ -864,6 +1140,7 @@ Core.Form.Validate = (function (TargetNS) {
                 highlight: TargetNS.HighlightError,
                 unhighlight: TargetNS.UnHighlightError,
                 errorPlacement: OnErrorElement,
+                invalidHandler: OnInvalidForm,
                 submitHandler: OnSubmit,
                 ignore: '.' + Options.IgnoreClass
             });
