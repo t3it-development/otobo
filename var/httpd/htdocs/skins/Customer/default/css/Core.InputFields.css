@@ -112,8 +112,8 @@ input.DynamicFieldText {
 
 #Subject {
     height: 56px;
-    padding: 0px;
-    padding-left: 32px;
+    box-sizing: border-box;
+    padding: 0px 56px 0px 32px;
 }
 /*#Subject:focus,
 .DynamicFieldText:focus {
@@ -145,17 +145,66 @@ input.DynamicFieldText:not([type=checkbox]),
 input.DynamicFieldDB,
 .InputField_Autocomplete {
     /* overwrite js-generated width */
-    width: calc( 100% - 32px ) !important;
+    width: 100% !important;
     height: 100%;
+    box-sizing: border-box;
     border-radius: 10px;
-    padding: 0px;
-    padding-left: 32px;
+    padding: 0px 56px 0px 32px;
 /*    border: solid 1px rgba(247, 247, 249, 0);
     background-color: #f7f7f9;
 -webkit-transition: border 0.2s ease;
    -moz-transition: border 0.2s ease;
      -o-transition: border 0.2s ease;
         transition: border 0.2s ease; */
+}
+
+/*
+ * Searchable dropdown actions are injected after .InputField_Search. The
+ * JavaScript adds an inline right offset, so !important is required to keep
+ * the action inside the input and in a consistent icon slot.
+ */
+.InputField_InputContainer > a.InputField_Action {
+    position: absolute;
+    z-index: 20;
+    top: 50%;
+    right: 16px !important;
+    left: auto !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: var(--colTextLight);
+    transform: translateY(-50%);
+}
+
+/* Put the dropdown action immediately to the left of a help tooltip. */
+.FieldCell:has(> .oooTooltip) .InputField_InputContainer > a.InputField_Action,
+.Row:has(> .oooTooltip) .InputField_InputContainer > a.InputField_Action {
+    right: 64px !important;
+}
+
+/* Reserve enough text space whenever both right-side icon slots are used. */
+.FieldCell:has(> .oooTooltip) .InputField_Search,
+.Row:has(> .oooTooltip) .InputField_Search {
+    padding-right: 96px;
+}
+
+.InputField_InputContainer > a.InputField_Action:hover,
+.InputField_InputContainer > a.InputField_Action:focus-visible {
+    color: var(--colMainLight);
+}
+
+/* Mirror the action slots in right-to-left layouts. */
+.RTL .InputField_InputContainer > a.InputField_Action {
+    right: auto !important;
+    left: 16px !important;
+}
+
+.RTL .FieldCell:has(> .oooTooltip) .InputField_InputContainer > a.InputField_Action,
+.RTL .Row:has(> .oooTooltip) .InputField_InputContainer > a.InputField_Action {
+    right: auto !important;
+    left: 64px !important;
 }
 
 .FieldCell > select,
@@ -165,6 +214,19 @@ input.DynamicFieldDB,
 /*    border: none;
     border: solid 1px rgba(247, 247, 249, 0);
     background-color: #f7f7f9; */
+}
+
+/*
+ * Keep native dynamic-field selects the same width as modernized selects and
+ * reserve the same help-icon space. Date selects are nested more deeply and
+ * are intentionally handled by .oooDateContainer below.
+ */
+.FieldCell > .Field > select,
+.Row > .Field > select {
+    width: 100% !important;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-right: 56px;
 }
 
 textarea {
@@ -177,8 +239,9 @@ textarea {
     letter-spacing: 0.35px;
     color: #00023c;
     color: var(--colTextDark);
-    width: calc( 100% - 48px );
-    padding: 16px 24px 16px 24px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 56px 16px 24px;
     border-radius: 10px;
     outline: none;
     resize: vertical;
@@ -365,6 +428,8 @@ label.oooFocus.LabelError {
 
 .oooTitle > p {
     white-space: normal;
+    box-sizing: border-box;
+    padding-right: 56px;
 }
 
 /* IE */
@@ -396,14 +461,32 @@ label.oooFocus.LabelError {
 .FieldCell > div.Field.oooCheckboxContainer,
 .Row > div.Field > div.oooDateContainer,
 .Row > div.Field.oooCheckboxContainer {
-    height: 38px;
-    padding-top: 16px;
-    padding-left: 16px;
+    display: flex;
+    align-items: center;
+    min-height: 56px;
+    height: auto;
+    box-sizing: border-box;
+    padding: 8px 56px 8px 16px;
     font-size: 16px;
     letter-spacing: 0.4px;
     color: #7f809d;
     color: var(--colTextLight);
-    white-space: nowrap;
+    white-space: normal;
+    border: solid 1px transparent;
+}
+
+div.Field.oooCheckboxContainer:hover, 
+div.oooDateContainer:hover {
+    border-radius: 10px;
+    border: solid 1px var(--colTextLight) !important;
+}
+
+div.Field.oooCheckboxContainer:focus-within,
+div.oooDateContainer:focus-within,
+div.Field.oooCheckboxContainer:has(input[type="checkbox"]:focus-visible),
+div.oooDateContainer:has(input[type="checkbox"]:focus-visible) {
+    border-radius: 10px;
+    border: solid 2px var(--colTextLight) !important;
 }
 
 .oooDateContainer > label,
@@ -412,6 +495,24 @@ label.oooFocus.LabelError {
 
     background-color: #fff;
     cursor: pointer;
+}
+
+.oooCheckboxContainer > label {
+    max-width: calc( 100% - 24px );
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+    white-space: normal;
+    vertical-align: top;
+}
+
+.FieldCell:has(> .oooCheckboxContainer) > .oooTooltip,
+.FieldCell:has(> .oooDateContainer) > .oooTooltip {
+    position: absolute;
+    top: 50%;
+    right: 32px;
+    left: auto;
+    margin-left: 0;
+    transform: translateY(-50%);
 }
 
 .FieldCell input[type='checkbox'],
@@ -531,6 +632,9 @@ div.InputField_More {
     background-color: #f7f7f9;
     background-color: var(--colBGLight);
 	width: auto;
+    max-width: calc( 100% - 56px - 16px );
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 div.InputField_Selection {
@@ -553,8 +657,30 @@ div.InputField_More > div {
     width: auto;
 }
 
+div.InputField_Selection > div.Text,
+div.InputField_More > div {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 div.InputField_Selection > .Remove {
-    padding-bottom: 2px;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding-bottom: 0px;
+    line-height: normal;
+    vertical-align: top;
+}
+
+div.InputField_Selection > .Remove > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
 }
 
 .InputField_Selection > div,
@@ -607,6 +733,10 @@ input[readonly] {
     top: 21px;
     left: -32px;
     margin-left: -22px; /* +4px for empty spaces */
+}
+
+.oooTooltip:hover {
+    z-index: 1200;
 }
 
 .Tooltip > .Content {

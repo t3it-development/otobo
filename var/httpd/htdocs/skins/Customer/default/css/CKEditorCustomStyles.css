@@ -47,7 +47,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
  
 .ck.ck-toolbar {
     padding-left: 14px;
-    padding-right: 0px;
+    /* Keep toolbar actions clear of the customer help tooltip. */
+    padding-right: 56px;
 }
 
 .ck.ck-dropdown.ck-heading-dropdown .ck-dropdown__button .ck-button__label {

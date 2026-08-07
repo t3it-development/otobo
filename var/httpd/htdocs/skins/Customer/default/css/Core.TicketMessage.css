@@ -184,7 +184,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     #Subject {
-        width: calc( 66% - 32px ) !important;
+        width: 66% !important;
         margin-left: 17%;
     }
 
